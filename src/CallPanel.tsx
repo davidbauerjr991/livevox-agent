@@ -22,6 +22,7 @@ import {
   Avatar,
   Button,
   Label,
+  MenuItem,
   SearchInput,
   formatPhoneForDisplay,
 } from "@nicecxone/lyra-ui";
@@ -159,16 +160,11 @@ export function CallPanel({
                   {
                     id: "recent",
                     title: "Recent",
+                    contentClassName: "p-0",
                     content: (
                       <div className="flex flex-col">
                         {recent.map((label) => (
-                          <button
-                            key={label}
-                            type="button"
-                            className="rounded-lyra-sm px-1 py-2 text-left lyra-body-md text-lyra-fg-default hover:bg-lyra-state-hover"
-                          >
-                            {label}
-                          </button>
+                          <MenuItem key={label} label={label} divider={false} />
                         ))}
                       </div>
                     ),
