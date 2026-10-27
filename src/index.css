@@ -1,0 +1,18 @@
+/* Lyra tokens are imported in main.tsx — do not @import them here too. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color: var(--lyra-color-fg-default);
+  background: var(--lyra-color-bg-surface-shell);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
