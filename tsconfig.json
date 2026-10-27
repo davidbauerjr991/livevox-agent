@@ -18,6 +18,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@nicecxone/lyra-ui/customers-data": ["../lyra-ui/src/components/__stories__/create-new-customers-data.ts"],
+      "@nicecxone/lyra-ui/agents-data": ["../lyra-ui/src/components/__stories__/create-new-agents-data.ts"],
       "@nicecxone/lyra-ui": ["../lyra-ui/src/index.ts"],
       "react": ["./node_modules/@types/react"],
       "react/*": ["./node_modules/@types/react/*"],

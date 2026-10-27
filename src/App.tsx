@@ -5,105 +5,144 @@ import { useState, useRef, useEffect } from "react";
 import type React from "react";
 import {
   Plus,
-  Gauge,
-  Settings,
-  BarChart3,
-  CircleHelp,
-  Bell,
-  PanelRight,
+  Phone,
+  PhoneForwarded,
+  MessageSquare,
+  Inbox,
 } from "lucide-react";
 import {
-  AdminShell,
   Button,
-  AiIcon,
+  SearchInput,
   AppHeader,
-  AppNameMenu,
-  CXoneLogo,
+  Separator,
   LeftNav,
   ContentArea,
   Container,
-  ActionIconButton,
-  ProfileMenu,
-  defaultProfileMenuGroups,
-  DashboardIcon,
   AiPanel,
 } from "@nicecxone/lyra-ui";
 import type {
   DraggableVariant,
-  AppMenuGroup,
   NavItem,
   AiPanelSuggestion,
-  TreeMenuItem,
+  MenuEntry,
 } from "@nicecxone/lyra-ui";
+import { AgentProfile } from "./AgentProfileWithMenu";
+import type { AgentStatus as AgentStatusValue } from "./AgentProfileWithMenu";
+import { CustomersView } from "./CustomersView";
+import { findCustomerByPhone, unknownCustomer } from "./CustomerRecordView";
+import type { CustomerRecord } from "./CustomerRecordView";
+import { InboxPanel } from "./InboxPanel";
+import { TOTAL_UNREAD } from "./InboxPanel";
+import type { InboxView } from "./InboxPanel";
+import { ChatPanel } from "./ChatPanel";
+import { CallPanel } from "./CallPanel";
+import { DialPad } from "./DialPad";
+import { OutboundShell } from "./OutboundShell";
 import appIcon from "./assets/app-icon.svg";
 
-/* ── Sample nav data (mirrors Outbound Engagement) ── */
-const PANEL_ITEMS: TreeMenuItem[] = [
-  { label: "Campaigns", active: true },
-  { label: "Contact Lists" },
-  { label: "Do Not Call" },
-  { label: "Call Results" },
-  { label: "Scripts" },
-  { label: "Schedules" },
-  { label: "Reports" },
-  { label: "Settings" },
+/* ── Left icon rail — Voice / Direct / Chat / Inbox. Rendered collapsed, so
+   only the icons show; the labels remain as accessible names. ── */
+const NAV_SECTIONS = ["Voice", "Direct", "Chat", "Inbox"] as const;
+type NavSection = (typeof NAV_SECTIONS)[number];
+
+const NAV_ICONS: Record<NavSection, React.ReactNode> = {
+  Voice: <Phone className="h-4 w-4" strokeWidth={1.5} />,
+  Direct: <PhoneForwarded className="h-4 w-4" strokeWidth={1.5} />,
+  Chat: <MessageSquare className="h-4 w-4" strokeWidth={1.5} />,
+  Inbox: <Inbox className="h-4 w-4" strokeWidth={1.5} />,
+};
+
+const buildNavItems = (active: NavSection, onSelect: (s: NavSection) => void): NavItem[] =>
+  NAV_SECTIONS.map((label) => ({
+    icon: NAV_ICONS[label],
+    label,
+    active: label === active,
+    badge: label === "Inbox" ? TOTAL_UNREAD : undefined,
+    onClick: () => onSelect(label),
+  }));
+
+/* ── App name — static (no dropdown): icon + name, a divider, and a two-line
+   environment/service copy block. ── */
+function AppNameBlock() {
+  return (
+    <div className="flex items-center gap-4 p-2">
+      <img src={appIcon} alt="" className="h-6 w-6 flex-shrink-0" />
+      <span className="lyra-body-lg text-lyra-fg-default">
+        <span className="lyra-body-lg-emphasis">Outbound Engagement</span> Agent
+      </span>
+      <Separator orientation="vertical" className="h-8" />
+      <div className="flex flex-col">
+        <span className="lyra-body-lg text-lyra-fg-default">QAE_SGC_AUTO_27_STG4</span>
+        <span className="lyra-body-xs text-lyra-fg-secondary">AGENTUI_PREVIEW_SERVICE</span>
+      </div>
+    </div>
+  );
+}
+
+const SERVICES = [
+  "Cloud IVR Service (DO NOT MODIFY)",
+  "Commercial Card Manual",
+  "Customer Care (DO NOT CHANGE)",
+  "Customer Care Digital Agent",
+  "Customer Care Extended Panel",
+  "Customer Care Knowledge Worker",
+  "D Manual",
+  "IB_SMS_Fallback_48693",
+  "International_Manual",
+  "JD_SINCH_TEST",
 ];
 
-/* ── Sample left icon rail — same "Outbound Engagement Left Nav" set as
-   LeftNav.stories.tsx (Monitor/Configure/Review, Monitor active), since
-   this demo chrome's AppHeader already says "Outbound Engagement" too. ── */
-const NAV_ITEMS: NavItem[] = [
-  { icon: <Gauge className="h-4 w-4" strokeWidth={1.5} />, label: "Monitor", active: true },
-  { icon: <Settings className="h-4 w-4" strokeWidth={1.5} />, label: "Configure" },
-  { icon: <BarChart3 className="h-4 w-4" strokeWidth={1.5} />, label: "Review" },
-];
-
-/* ── App menu — same page-switcher content as lyra-ux-templates'
-   Header.tsx (Agent Next Gen / Agent Workspace Premium / Outbound
-   Engagement), with "Outbound Engagement" active since that's what this
-   demo's AppHeader displays. Click-to-open wiring comes from the shared
-   `AppNameMenu` component (app-name-menu.tsx) — only these group fixtures
-   are duplicated locally, since story files don't import from one
-   another. ── */
-const APP_MENU_GROUPS: AppMenuGroup[] = [
+const PROFILE_MENU_ITEMS: MenuEntry[] = [
+  { id: "change-password", label: "Change Password" },
   {
-    items: [
-      { label: "Agent Next Gen" },
-      { label: "Agent Workspace Premium" },
-      { label: "Outbound Engagement", active: true },
+    id: "change-service",
+    label: "Change Service",
+    submenu: [
+      ...SERVICES.map((label): MenuEntry => ({ id: label, label })),
+      { id: "show-more", label: "Show more…" },
     ],
   },
+  { id: "settings", label: "Settings" },
 ];
 
-function AppNameWithMenu({ name }: { name: string }) {
+/* Agent status + elapsed-time-in-status, shown beside the avatar. The timer
+   restarts whenever the status changes. */
+function formatElapsed(totalSeconds: number) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(totalSeconds / 3600))}:${pad(Math.floor((totalSeconds % 3600) / 60))}:${pad(totalSeconds % 60)}`;
+}
+
+function AgentStatus() {
+  const [status, setStatus] = useState<AgentStatusValue>("available");
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    setSeconds(0);
+    const id = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [status]);
+
   return (
-    <AppNameMenu
-      icon={<img src={appIcon} alt="" className="h-6 w-6" />}
-      name={name}
-      groups={APP_MENU_GROUPS}
-      menuFooter={<CXoneLogo />}
+    <AgentProfile
+      name="John Smith"
+      initials="JS"
+      status={status}
+      onStatusChange={setStatus}
+      timer={formatElapsed(seconds)}
+      hideAgentLeg
+      hideConnectedApps
+      profileMenuItems={PROFILE_MENU_ITEMS}
     />
   );
 }
 
 const HEADER_ACTIONS = (
   <>
-    <ActionIconButton size="xl" title="Help">
-      <CircleHelp className="h-5 w-5" strokeWidth={1.5} />
-    </ActionIconButton>
-    <ActionIconButton size="xl" title="Dashboards">
-      <DashboardIcon className="text-lyra-fg-default" />
-    </ActionIconButton>
-    <ActionIconButton size="xl" title="Notifications" badge={4}>
-      <Bell className="h-5 w-5" strokeWidth={1.5} />
-    </ActionIconButton>
-    <ProfileMenu
-      initials="JS"
-      avatarColor="#5d6a79"
-      groups={defaultProfileMenuGroups}
-      showThemeToggle
-      className="ml-1"
-    />
+    <span className="lyra-body-md mx-2 whitespace-nowrap text-lyra-fg-default">
+      CIP: 0 | HOLD: 0 | REM: 0
+    </span>
+    <Separator orientation="vertical" className="mx-2 h-8" />
+    <AgentStatus />
   </>
 );
 
@@ -127,8 +166,7 @@ const AI_SUGGESTIONS: AiPanelSuggestion[] = [
  * see Draggable.stories.tsx's `MultiplePanelsSingleDock` story and its
  * "App Header" control.
  */
-function AppChrome({ children }: { children: (onAskAi: () => void) => React.ReactNode }) {
-  const [navOpen, setNavOpen] = useState(false);
+function AppChrome({ navItems, children }: { navItems: NavItem[]; children: (onAskAi: () => void) => React.ReactNode }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   type PanelState = "closed" | "open" | "closing";
@@ -223,11 +261,11 @@ function AppChrome({ children }: { children: (onAskAi: () => void) => React.Reac
        (e.g. prototype exports) have no such decorator. */
     <div className="flex h-screen flex-col overflow-hidden bg-lyra-bg-surface-shell">
       <AppHeader
-        appName={<AppNameWithMenu name="Outbound Engagement Agent" />}
+        appName={<AppNameBlock />}
         actions={HEADER_ACTIONS}
       />
       <div className="flex flex-1 overflow-hidden bg-lyra-bg-surface-shell">
-        <LeftNav items={NAV_ITEMS} open={navOpen} onToggle={() => setNavOpen((v) => !v)} />
+        <LeftNav items={navItems} open={false} collapsible={false} />
 
         <ContentArea ref={containerRef} className="relative min-w-0">
           <Container className="relative flex flex-1 overflow-hidden">
@@ -292,44 +330,70 @@ function AppChrome({ children }: { children: (onAskAi: () => void) => React.Reac
 }
 
 export default function App() {
-  const [interiorPanelOpen, setInteriorPanelOpen] = useState(false);
+  const [dbSearch, setDbSearch] = useState("");
+  const [openCustomers, setOpenCustomers] = useState<CustomerRecord[]>([]);
+  const [activeTab, setActiveTab] = useState("Customers");
+  const [inboxView, setInboxView] = useState<InboxView>({ boxId: null, messageId: null });
+  const [activeNav, setActiveNav] = useState<NavSection>("Voice");
+  const [activeCall, setActiveCall] = useState<{ number: string; accountNumber: string; customer: CustomerRecord | null } | null>(null);
+
+  // The call controls own the side panel for the length of a call, so the rail can't navigate away.
+  const section: NavSection = activeCall ? "Voice" : activeNav;
+  const navItems = buildNavItems(section, (s) => { if (!activeCall) setActiveNav(s); });
+
+  // Dialing opens the matching customer's record in its own tab (or focuses it if already open).
+  const handleDial = (number: string, accountNumber: string) => {
+    const match = findCustomerByPhone(number);
+    setActiveCall({ number, accountNumber, customer: match });
+    const customer = match ?? unknownCustomer(number);
+    setOpenCustomers((prev) => (prev.some((c) => c.id === customer.id) ? prev : [...prev, customer]));
+    setActiveTab(customer.id);
+  };
+
+  const handleCloseCustomer = (id: string) => {
+    setOpenCustomers((prev) => prev.filter((c) => c.id !== id));
+    setActiveTab((current) => (current === id ? "Customers" : current));
+  };
 
   return (
-    <AppChrome>
-      {(onAskAi) => (
-        <AdminShell
+    <AppChrome navItems={navItems}>
+      {() => (
+        <OutboundShell
           storageKeyPrefix="livevox_agent"
-          navTitle="Outbound"
-          navItems={PANEL_ITEMS}
+          // No title while a call is live — that hides the panel header so the call controls sit at the very top.
+          // Inbox drill-down levels draw their own back-arrow header, so the panel header is hidden there too.
+          navTitle={activeCall || (section === "Inbox" && inboxView.boxId) ? "" : section}
+          lockLeftPanel={activeCall !== null}
+          leftPanelContent={
+            <div key={`${section}-${inboxView.boxId}-${inboxView.messageId}`} className="h-full animate-in fade-in-0 duration-200">
+              {activeCall ? (
+                <CallPanel number={activeCall.number} accountNumber={activeCall.accountNumber} customer={activeCall.customer} onEndCall={() => setActiveCall(null)} />
+              ) : section === "Voice" ? (
+                <DialPad onDial={handleDial} />
+              ) : section === "Chat" ? (
+                <ChatPanel />
+              ) : section === "Inbox" ? (
+                <InboxPanel view={inboxView} onViewChange={setInboxView} />
+              ) : null}
+            </div>
+          }
           defaultLeftPinned
           showPageHeader
-          pageTitle="Campaigns"
+          pageTitle="Agent Workspace"
           pageActions={
             <>
-              <Button variant="outline">Secondary</Button>
+              <SearchInput
+                className="w-80"
+                placeholder="Search Customers, Accounts, Tickets"
+                aria-label="Search Customers, Accounts, Tickets"
+                value={dbSearch}
+                onValueChange={setDbSearch}
+              />
               <Button>
                 <Plus className="h-4 w-4 mr-1" strokeWidth={1.5} />
-                New Campaign
+                New
               </Button>
-              <div className="mx-1 h-6 w-px bg-lyra-border-subtle" />
-              <Button variant="outline" onClick={onAskAi}>
-                <AiIcon className="h-4 w-4" />
-                Ask AI
-              </Button>
-              <ActionIconButton
-                title="Toggle details panel"
-                onClick={() => setInteriorPanelOpen((v) => !v)}
-              >
-                <PanelRight className="h-5 w-5" strokeWidth={1.5} />
-              </ActionIconButton>
             </>
-          }
-          interiorPanelOpen={interiorPanelOpen}
-          onInteriorPanelClose={() => setInteriorPanelOpen(false)}
-          interiorPanelContent={
-            <div className="p-4">
-              <p className="lyra-body-md text-lyra-fg-secondary">Panel content goes here.</p>
-            </div>
           }
           rightPanelContent={
             <div className="p-4">
@@ -337,8 +401,13 @@ export default function App() {
             </div>
           }
         >
-          <div className="flex-1" />
-        </AdminShell>
+          <CustomersView
+            openCustomers={openCustomers}
+            activeTab={activeTab}
+            onActiveTabChange={setActiveTab}
+            onCloseCustomer={handleCloseCustomer}
+          />
+        </OutboundShell>
       )}
     </AppChrome>
   );
