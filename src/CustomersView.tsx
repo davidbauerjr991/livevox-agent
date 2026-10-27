@@ -68,21 +68,20 @@ type ColKey =
   | "contactNumber" | "firstName" | "lastName" | "group" | "firstPhone"
   | "emailAddress" | "address1" | "city" | "state" | "postalCode";
 
-const COLUMNS: Record<ColKey, { label: string; flex: string; minWidth: string; minWidthPx: number }> = {
-  contactNumber: { label: "Contact Number", flex: "flex-1",     minWidth: "min-w-[120px]", minWidthPx: 120 },
-  firstName:     { label: "First Name",     flex: "flex-1",     minWidth: "min-w-[100px]", minWidthPx: 100 },
-  lastName:      { label: "Last Name",      flex: "flex-1",     minWidth: "min-w-[100px]", minWidthPx: 100 },
-  group:         { label: "Group",          flex: "flex-[0.7]", minWidth: "min-w-[90px]",  minWidthPx: 90 },
-  firstPhone:    { label: "First Phone",    flex: "flex-[1.2]", minWidth: "min-w-[140px]", minWidthPx: 140 },
-  emailAddress:  { label: "Email Address",  flex: "flex-[1.6]", minWidth: "min-w-[200px]", minWidthPx: 200 },
-  address1:      { label: "Address 1",      flex: "flex-[1.6]", minWidth: "min-w-[180px]", minWidthPx: 180 },
-  city:          { label: "City",           flex: "flex-1",     minWidth: "min-w-[100px]", minWidthPx: 100 },
-  state:         { label: "State",          flex: "flex-[0.6]", minWidth: "min-w-[70px]",  minWidthPx: 70 },
-  postalCode:    { label: "Postal Code",    flex: "flex-[0.8]", minWidth: "min-w-[100px]", minWidthPx: 100 },
+const COLUMNS: Record<ColKey, { label: string; flex: string }> = {
+  contactNumber: { label: "Contact Number", flex: "flex-1" },
+  firstName:     { label: "First Name",     flex: "flex-1" },
+  lastName:      { label: "Last Name",      flex: "flex-1" },
+  group:         { label: "Group",          flex: "flex-[0.7]" },
+  firstPhone:    { label: "First Phone",    flex: "flex-[1.2]" },
+  emailAddress:  { label: "Email Address",  flex: "flex-[1.6]" },
+  address1:      { label: "Address 1",      flex: "flex-[1.6]" },
+  city:          { label: "City",           flex: "flex-1" },
+  state:         { label: "State",          flex: "flex-[0.6]" },
+  postalCode:    { label: "Postal Code",    flex: "flex-[0.8]" },
 };
 const COLUMN_KEYS = Object.keys(COLUMNS) as ColKey[];
 const COLUMN_DEFS = COLUMN_KEYS.map((key) => ({ key, label: COLUMNS[key].label }));
-const ACTIONS_COLUMN_WIDTH = 48;
 
 type FilterKey = Exclude<keyof CustomerRecord, never>;
 const FILTER_FIELDS: { key: FilterKey; label: string }[] = [
@@ -159,9 +158,6 @@ function CustomersTable() {
     });
   }, [searchQuery, addedFilterKeys, filterValues, sortKey, sortDir]);
 
-  const tableMinWidth =
-    ACTIONS_COLUMN_WIDTH + columnOrder.reduce((sum: number, key: ColKey) => sum + COLUMNS[key].minWidthPx, 0);
-
   const totalRecords = sortedRows.length;
   const totalPages = Math.max(1, Math.ceil(totalRecords / rowsPerPage));
   const safePage = Math.min(currentPage, totalPages);
@@ -207,13 +203,13 @@ function CustomersTable() {
       />
 
       <div className="flex-1 min-h-0 overflow-auto px-6">
-        <Table style={{ minWidth: tableMinWidth }}>
+        <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               {columnOrder.map((key: ColKey) => (
                 <SortableTableHead
                   key={key}
-                  className={cn(COLUMNS[key].flex, COLUMNS[key].minWidth, "relative")}
+                  className={cn(COLUMNS[key].flex, "relative")}
                   sortDirection={sortKey === key ? sortDir : null}
                   onSort={() => handleSort(key)}
                   columnKey={key}
@@ -234,7 +230,7 @@ function CustomersTable() {
             {pageRows.map((row) => (
               <TableRow key={row.contactNumber} selectable className="group cursor-pointer">
                 {columnOrder.map((key: ColKey) => (
-                  <TableCell key={key} columnKey={key} className={cn(COLUMNS[key].flex, COLUMNS[key].minWidth)}>
+                  <TableCell key={key} columnKey={key} className={COLUMNS[key].flex}>
                     {row[key]}
                   </TableCell>
                 ))}
